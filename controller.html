@@ -9,11 +9,13 @@
 body {
   font-family: "Meiryo", "Noto Sans JP", sans-serif;
   font-size: 13px;
-  background: transparent;
+  background: #0f0f1a;
   color: #ccc;
   height: 100vh;
   overflow: hidden;
 }
+
+body.transparent-mode { background: transparent; }
 
 /* ===== SETUP SCREEN ===== */
 #setup-screen {
@@ -234,6 +236,11 @@ input:focus { outline: 1px solid #a78bfa; }
         <input type="password" id="apikey-input" placeholder="AIzaSy..." autocomplete="off" spellcheck="false">
       </div>
       <div class="setup-error" id="setup-error"></div>
+      <div class="form-row" style="margin-top:6px">
+        <label for="transparent-toggle">透過モード</label>
+        <input type="checkbox" id="transparent-toggle" style="width:auto;flex:none">
+        <span style="color:#6b7280;font-size:11px">OBSブラウザソース(オーバーレイ)として使う場合のみON</span>
+      </div>
       <div class="start-row">
         <button class="btn btn-primary" id="start-btn">保存して開始</button>
       </div>
@@ -302,8 +309,9 @@ const SYSTEM_PROMPT = {
 // =====================================================
 //  状態
 // =====================================================
-const LS_APIKEY = "gemini_apiKey";
-const LS_DICT   = "ai_listener_dict";
+const LS_APIKEY      = "gemini_apiKey";
+const LS_DICT        = "ai_listener_dict";
+const LS_TRANSPARENT = "ai_listener_transparent";
 
 let history      = [];
 let isCoolingDown = false;
@@ -317,9 +325,10 @@ let dict          = [];
 // =====================================================
 const setupScreen  = document.getElementById("setup-screen");
 const chatScreen   = document.getElementById("chat-screen");
-const apikeyInput  = document.getElementById("apikey-input");
-const startBtn     = document.getElementById("start-btn");
-const setupError   = document.getElementById("setup-error");
+const apikeyInput       = document.getElementById("apikey-input");
+const startBtn          = document.getElementById("start-btn");
+const setupError        = document.getElementById("setup-error");
+const transparentToggle = document.getElementById("transparent-toggle");
 const chatStatus   = document.getElementById("chat-status");
 const chatArea     = document.getElementById("chat-area");
 const settingsBtn  = document.getElementById("settings-btn");
@@ -331,6 +340,12 @@ const dictAddBtn   = document.getElementById("dict-add-btn");
 // =====================================================
 //  画面切り替え
 // =====================================================
+function applyTransparentMode() {
+  const on = localStorage.getItem(LS_TRANSPARENT) === "1";
+  document.body.classList.toggle("transparent-mode", on);
+  transparentToggle.checked = on;
+}
+
 function showSetup() {
   srStopped = true;
   if (srInstance) { try { srInstance.abort(); } catch {} srInstance = null; }
@@ -338,7 +353,13 @@ function showSetup() {
   setupScreen.hidden = false;
   apikeyInput.value  = localStorage.getItem(LS_APIKEY) || "";
   setupError.textContent = "";
+  applyTransparentMode();
 }
+
+transparentToggle.addEventListener("change", () => {
+  localStorage.setItem(LS_TRANSPARENT, transparentToggle.checked ? "1" : "0");
+  applyTransparentMode();
+});
 
 function showChat() {
   setupScreen.hidden = true;
@@ -510,7 +531,7 @@ function startSpeech() {
   srInstance.continuous     = true;
   srInstance.interimResults = false;
 
-  srInstance.onstart = () => setStatus("● 待機中...");
+  srInstance.onstart = () => { clearTimeout(startTimeout); setStatus("● 待機中..."); };
 
   srInstance.onresult = (e) => {
     const result = e.results[e.results.length - 1];
@@ -524,19 +545,43 @@ function startSpeech() {
   };
 
   srInstance.onerror = (e) => {
+    console.warn("SR error:", e.error);
     if (e.error === "not-allowed" || e.error === "service-not-allowed") {
       setStatus("✗ マイク拒否");
-      setupError.textContent = "マイクへのアクセスを許可してから再度「保存して開始」を押してください";
+      setupError.textContent = "マイクが拒否されました。OBSのドック上で右クリック→「マイクへのアクセスを許可」を確認し、再度「保存して開始」を押してください。";
+      showSetup();
+    } else if (e.error === "network") {
+      setStatus("⚠ ネットワークエラー — 再接続中...");
+    } else if (e.error === "audio-capture") {
+      setStatus("✗ マイク取得失敗");
+      setupError.textContent = "マイクが見つかりません。OBSのマイク設定を確認してください。";
       showSetup();
     }
-    // network / no-speech など一時的エラーは onend で再起動される
+    // no-speech / aborted は onend で自動再起動される
   };
 
   srInstance.onend = () => {
     if (!srStopped) {
-      setTimeout(() => { if (!srStopped && srInstance) srInstance.start(); }, 300);
+      setTimeout(() => {
+        if (!srStopped && srInstance) {
+          try { srInstance.start(); } catch {}
+        }
+      }, 500);
     }
   };
+
+  // 起動後5秒でもonstartが来なければ案内を表示
+  const startTimeout = setTimeout(() => {
+    if (chatStatus.textContent === "起動中...") {
+      setStatus("⚠ マイク許可待ち");
+      // OBSのドックにダイアログが隠れている可能性を案内
+      const hint = document.createElement("div");
+      hint.className = "bubble";
+      hint.style.cssText = "background:rgba(60,30,0,0.9);color:#fcd34d;border-left-color:#f59e0b;font-size:12px";
+      hint.textContent = "マイクの許可ダイアログがOBSのどこかに出ています。OBSウィンドウ全体を確認してください。";
+      chatArea.appendChild(hint);
+    }
+  }, 5000);
 
   srInstance.start();
 }
@@ -559,6 +604,7 @@ startBtn.addEventListener("click", () => {
 // =====================================================
 loadDict();
 renderDict();
+applyTransparentMode();
 
 if (localStorage.getItem(LS_APIKEY)) {
   showChat();
