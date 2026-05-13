@@ -471,7 +471,7 @@ async function sendToGemini(transcript) {
           ...history,
           { role: "user", parts: [{ text: transcript }] }
         ],
-        generationConfig: { thinkingConfig: { thinkingBudget: 0 } }
+        generationConfig: { temperature: 1.0 }
       })
     });
 
@@ -487,7 +487,11 @@ async function sendToGemini(transcript) {
     if (!res.ok) {
       const body = await res.text().catch(() => "");
       setStatus(`⚠ APIエラー ${res.status}`);
-      console.error("Gemini error:", res.status, body.slice(0, 200));
+      const detail = (() => {
+        try { return JSON.parse(body)?.error?.message || body; } catch { return body; }
+      })();
+      addBubble(`APIエラー ${res.status}: ${detail.slice(0, 80)}`);
+      console.error("Gemini error:", res.status, body);
       setTimeout(() => setStatus("● 待機中..."), 3000);
       return;
     }
