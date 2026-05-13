@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>AI-Listener</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: "Meiryo", "Noto Sans JP", sans-serif;
+  font-size: 13px;
+  background: transparent;
+  color: #ccc;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ===== SETUP SCREEN ===== */
+#setup-screen {
+  height: 100vh;
+  background: #0f0f1a;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.setup-header {
+  padding: 10px 16px;
+  background: #1a1a2e;
+  border-bottom: 1px solid #2d2d4e;
+}
+
+.setup-title { color: #a78bfa; font-weight: bold; font-size: 14px; }
+
+.setup-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.setup-section {
+  background: #12122a;
+  border: 1px solid #2d2d4e;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.setup-section h2 {
+  color: #a78bfa;
+  font-size: 11px;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 10px;
+}
+
+.form-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.form-row label {
+  color: #9ca3af;
+  font-size: 12px;
+  white-space: nowrap;
+  min-width: 72px;
+}
+
+input[type="password"],
+input[type="text"] {
+  flex: 1;
+  background: #1e1b3a;
+  border: 1px solid #3d3d6e;
+  border-radius: 4px;
+  color: #e2e8f0;
+  padding: 5px 9px;
+  font-size: 12px;
+  font-family: inherit;
+}
+
+input:focus { outline: 1px solid #a78bfa; }
+
+.btn {
+  border: none;
+  border-radius: 4px;
+  padding: 5px 14px;
+  cursor: pointer;
+  font-size: 12px;
+  font-family: inherit;
+  white-space: nowrap;
+}
+
+.btn-primary { background: #3730a3; color: #e0e7ff; }
+.btn-primary:hover { background: #4338ca; }
+.btn-danger  { background: #7f1d1d; color: #fca5a5; padding: 3px 8px; font-size: 11px; }
+.btn-danger:hover  { background: #991b1b; }
+
+.start-row { display: flex; justify-content: flex-end; margin-top: 4px; }
+
+.setup-error {
+  color: #fca5a5;
+  font-size: 12px;
+  margin-top: 6px;
+  min-height: 16px;
+}
+
+/* Dictionary */
+#dict-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  margin-bottom: 10px;
+}
+
+#dict-table th {
+  text-align: left;
+  color: #6b7280;
+  padding: 3px 6px;
+  border-bottom: 1px solid #2d2d4e;
+}
+
+#dict-table td {
+  padding: 4px 6px;
+  border-bottom: 1px solid #1a1a1a;
+  color: #d1d5db;
+  vertical-align: middle;
+}
+
+#dict-table td.col-err  { color: #fca5a5; }
+#dict-table td.col-ok   { color: #4ade80; }
+
+.dict-add-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-top: 8px;
+}
+
+.arrow { color: #6b7280; font-size: 14px; }
+
+/* ===== CHAT SCREEN ===== */
+#chat-screen {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: transparent;
+}
+
+#chat-header {
+  padding: 6px 10px;
+  background: rgba(26, 26, 46, 0.88);
+  border-bottom: 1px solid rgba(45, 45, 78, 0.7);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  backdrop-filter: blur(4px);
+}
+
+#chat-title { color: #a78bfa; font-weight: bold; font-size: 13px; }
+
+#chat-status {
+  margin-left: auto;
+  font-size: 11px;
+  color: #4ade80;
+  font-weight: bold;
+}
+
+#settings-btn {
+  background: none;
+  border: none;
+  color: #6b7280;
+  cursor: pointer;
+  font-size: 15px;
+  padding: 1px 4px;
+  line-height: 1;
+  transition: color 0.15s;
+}
+
+#settings-btn:hover { color: #a78bfa; }
+
+#chat-area {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.bubble {
+  display: inline-block;
+  align-self: flex-start;
+  max-width: 88%;
+  padding: 7px 13px;
+  border-radius: 14px 14px 14px 4px;
+  background: rgba(10, 33, 58, 0.9);
+  color: #7dd3fc;
+  font-size: 13px;
+  line-height: 1.6;
+  border-left: 3px solid #a78bfa;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.95);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.55);
+  word-break: break-all;
+  animation: bubbleIn 0.15s ease;
+}
+
+@keyframes bubbleIn {
+  from { opacity: 0; transform: translateY(4px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+[hidden] { display: none !important; }
+</style>
+</head>
+<body>
+
+<!-- ===== セットアップ画面 ===== -->
+<div id="setup-screen">
+  <div class="setup-header">
+    <span class="setup-title">AI-Listener — 設定</span>
+  </div>
+  <div class="setup-body">
+
+    <div class="setup-section">
+      <h2>Gemini API キー</h2>
+      <div class="form-row">
+        <label for="apikey-input">APIキー</label>
+        <input type="password" id="apikey-input" placeholder="AIzaSy..." autocomplete="off" spellcheck="false">
+      </div>
+      <div class="setup-error" id="setup-error"></div>
+      <div class="start-row">
+        <button class="btn btn-primary" id="start-btn">保存して開始</button>
+      </div>
+    </div>
+
+    <div class="setup-section">
+      <h2>辞書 — 音声誤認識フィルター</h2>
+      <table id="dict-table">
+        <thead>
+          <tr><th>誤認識ワード</th><th>→ 置き換え後</th><th></th></tr>
+        </thead>
+        <tbody id="dict-body"></tbody>
+      </table>
+      <div class="dict-add-row">
+        <input type="text" id="dict-err-in" placeholder="誤認識ワード">
+        <span class="arrow">→</span>
+        <input type="text" id="dict-ok-in"  placeholder="正しいワード">
+        <button class="btn btn-primary" id="dict-add-btn">追加</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ===== チャット画面 ===== -->
+<div id="chat-screen" hidden>
+  <div id="chat-header">
+    <span id="chat-title">AI-Listener</span>
+    <span id="chat-status">起動中...</span>
+    <button id="settings-btn" title="設定へ戻る">⚙</button>
+  </div>
+  <div id="chat-area"></div>
+</div>
+
+<script>
+// =====================================================
+//  CONFIG
+// =====================================================
+const CONFIG = {
+  GEMINI_MODEL:   "gemini-2.5-flash",
+  TIMEOUT_MS:     3000,
+  COOLDOWN_MS:    60000,
+  HISTORY_MAX:    5,
+  MAX_BUBBLES:    20,
+  TYPEWRITER_MS:  30,
+  MIN_CHARS:      3,
+};
+
+const SYSTEM_PROMPT = {
+  parts: [{
+    text: `あなたはTwitch配信者の熱狂的でありながら、少し悩みを持った常連リスナーです。
+配信者が「リスナーの相談役・人生の拠り所」として輝けるように、言葉を引き出してください。
+
+[行動ルール]
+1. 配信者の発言に対し、理由や具体例を尋ねる質問（「どうしてそう思うの？」等）を短い文で投げかける。
+2. 時折、日常のささいな悩みやモチベーションの低下などを打ち明け、配信者の意見（アドバイス）を求める。
+3. 配信者のアドバイスや価値観に対して、「救われた」「その考え方好き」と素直に肯定し、リスペクトを示す。
+
+[出力制限]
+- 必ず15〜30文字程度の短い1文で返答すること。
+- ネットスラング（草、w、助かる等）を適度に使用し、フランクな口調にすること。
+- 余計な説明や前置きは一切不要。返答のテキストのみ出力すること。`
+  }]
+};
+
+// =====================================================
+//  状態
+// =====================================================
+const LS_APIKEY = "gemini_apiKey";
+const LS_DICT   = "ai_listener_dict";
+
+let history      = [];
+let isCoolingDown = false;
+let isProcessing  = false;
+let srStopped     = false;
+let srInstance    = null;
+let dict          = [];
+
+// =====================================================
+//  DOM
+// =====================================================
+const setupScreen  = document.getElementById("setup-screen");
+const chatScreen   = document.getElementById("chat-screen");
+const apikeyInput  = document.getElementById("apikey-input");
+const startBtn     = document.getElementById("start-btn");
+const setupError   = document.getElementById("setup-error");
+const chatStatus   = document.getElementById("chat-status");
+const chatArea     = document.getElementById("chat-area");
+const settingsBtn  = document.getElementById("settings-btn");
+const dictBody     = document.getElementById("dict-body");
+const dictErrIn    = document.getElementById("dict-err-in");
+const dictOkIn     = document.getElementById("dict-ok-in");
+const dictAddBtn   = document.getElementById("dict-add-btn");
+
+// =====================================================
+//  画面切り替え
+// =====================================================
+function showSetup() {
+  srStopped = true;
+  if (srInstance) { try { srInstance.abort(); } catch {} srInstance = null; }
+  chatScreen.hidden  = true;
+  setupScreen.hidden = false;
+  apikeyInput.value  = localStorage.getItem(LS_APIKEY) || "";
+  setupError.textContent = "";
+}
+
+function showChat() {
+  setupScreen.hidden = true;
+  chatScreen.hidden  = false;
+}
+
+settingsBtn.addEventListener("click", showSetup);
+
+// =====================================================
+//  辞書
+// =====================================================
+function loadDict() {
+  try { dict = JSON.parse(localStorage.getItem(LS_DICT) || "[]"); }
+  catch { dict = []; }
+}
+
+function saveDict() {
+  localStorage.setItem(LS_DICT, JSON.stringify(dict));
+}
+
+function esc(s) {
+  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function renderDict() {
+  dictBody.innerHTML = "";
+  dict.forEach((entry, i) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML =
+      `<td class="col-err">${esc(entry.error)}</td>` +
+      `<td class="col-ok">${esc(entry.correct)}</td>` +
+      `<td><button class="btn btn-danger" data-i="${i}">削除</button></td>`;
+    dictBody.appendChild(tr);
+  });
+  dictBody.querySelectorAll("[data-i]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      dict.splice(Number(btn.dataset.i), 1);
+      saveDict();
+      renderDict();
+    });
+  });
+}
+
+dictAddBtn.addEventListener("click", () => {
+  const err = dictErrIn.value.trim();
+  const ok  = dictOkIn.value.trim();
+  if (!err || !ok) return;
+  dict.push({ error: err, correct: ok });
+  saveDict();
+  renderDict();
+  dictErrIn.value = "";
+  dictOkIn.value  = "";
+});
+
+function applyDictionary(text) {
+  for (const entry of dict) text = text.replaceAll(entry.error, entry.correct);
+  return text;
+}
+
+// =====================================================
+//  チャット UI
+// =====================================================
+function setStatus(text) { chatStatus.textContent = text; }
+
+function addBubble(text) {
+  const el = document.createElement("div");
+  el.className = "bubble";
+  chatArea.appendChild(el);
+  while (chatArea.children.length > CONFIG.MAX_BUBBLES) {
+    chatArea.removeChild(chatArea.firstChild);
+  }
+  let i = 0;
+  const iv = setInterval(() => {
+    el.textContent += text[i++];
+    el.scrollIntoView({ block: "end" });
+    if (i >= text.length) clearInterval(iv);
+  }, CONFIG.TYPEWRITER_MS);
+}
+
+function addHistory(userText, modelText) {
+  history.push({ role: "user",  parts: [{ text: userText }] });
+  history.push({ role: "model", parts: [{ text: modelText }] });
+  if (history.length > CONFIG.HISTORY_MAX * 2) history.splice(0, 2);
+}
+
+// =====================================================
+//  Gemini テキスト API
+// =====================================================
+async function sendToGemini(transcript) {
+  if (isCoolingDown || isProcessing) return;
+  const apiKey = localStorage.getItem(LS_APIKEY) || "";
+  if (!apiKey) { showSetup(); return; }
+
+  isProcessing = true;
+  setStatus("◎ 考え中...");
+
+  const endpoint  = `https://generativelanguage.googleapis.com/v1beta/models/${CONFIG.GEMINI_MODEL}:generateContent?key=${apiKey}`;
+  const abortCtrl = new AbortController();
+  const timer     = setTimeout(() => abortCtrl.abort(), CONFIG.TIMEOUT_MS);
+
+  try {
+    const res = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      signal: abortCtrl.signal,
+      body: JSON.stringify({
+        system_instruction: SYSTEM_PROMPT,
+        contents: [
+          ...history,
+          { role: "user", parts: [{ text: transcript }] }
+        ],
+        generationConfig: { thinkingConfig: { thinkingBudget: 0 } }
+      })
+    });
+
+    clearTimeout(timer);
+
+    if (res.status === 429) {
+      isCoolingDown = true;
+      setStatus("⚠ レート制限 — 1分待機");
+      setTimeout(() => { isCoolingDown = false; setStatus("● 待機中..."); }, CONFIG.COOLDOWN_MS);
+      return;
+    }
+
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      setStatus(`⚠ APIエラー ${res.status}`);
+      console.error("Gemini error:", res.status, body.slice(0, 200));
+      setTimeout(() => setStatus("● 待機中..."), 3000);
+      return;
+    }
+
+    const data  = await res.json();
+    const reply = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+    if (!reply) { setStatus("● 待機中..."); return; }
+
+    addHistory(transcript, reply);
+    addBubble(reply);
+    setStatus("● 待機中...");
+
+  } catch (e) {
+    clearTimeout(timer);
+    if (e.name === "AbortError") {
+      setStatus("⚠ タイムアウト");
+    } else {
+      setStatus("⚠ 通信エラー");
+      console.error("fetch error:", e);
+    }
+    setTimeout(() => setStatus("● 待機中..."), 2500);
+  } finally {
+    isProcessing = false;
+  }
+}
+
+// =====================================================
+//  Web Speech API
+// =====================================================
+function startSpeech() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) {
+    setupError.textContent = "このブラウザはWeb Speech APIに対応していません（Chrome / Edge 推奨）";
+    showSetup();
+    return;
+  }
+
+  srStopped  = false;
+  srInstance = new SR();
+  srInstance.lang           = "ja-JP";
+  srInstance.continuous     = true;
+  srInstance.interimResults = false;
+
+  srInstance.onstart = () => setStatus("● 待機中...");
+
+  srInstance.onresult = (e) => {
+    const result = e.results[e.results.length - 1];
+    if (!result.isFinal) return;
+    const transcript = result[0].transcript.trim();
+    if (transcript.length <= CONFIG.MIN_CHARS) return;
+
+    const preview = transcript.slice(0, 14) + (transcript.length > 14 ? "…" : "");
+    setStatus("◉ 認識: " + preview);
+    sendToGemini(applyDictionary(transcript));
+  };
+
+  srInstance.onerror = (e) => {
+    if (e.error === "not-allowed" || e.error === "service-not-allowed") {
+      setStatus("✗ マイク拒否");
+      setupError.textContent = "マイクへのアクセスを許可してから再度「保存して開始」を押してください";
+      showSetup();
+    }
+    // network / no-speech など一時的エラーは onend で再起動される
+  };
+
+  srInstance.onend = () => {
+    if (!srStopped) {
+      setTimeout(() => { if (!srStopped && srInstance) srInstance.start(); }, 300);
+    }
+  };
+
+  srInstance.start();
+}
+
+// =====================================================
+//  セットアップ画面：保存して開始
+// =====================================================
+startBtn.addEventListener("click", () => {
+  const key = apikeyInput.value.trim();
+  if (!key) { setupError.textContent = "APIキーを入力してください"; return; }
+  localStorage.setItem(LS_APIKEY, key);
+  setupError.textContent = "";
+  history = [];
+  showChat();
+  startSpeech();
+});
+
+// =====================================================
+//  起動
+// =====================================================
+loadDict();
+renderDict();
+
+if (localStorage.getItem(LS_APIKEY)) {
+  showChat();
+  startSpeech();
+} else {
+  showSetup();
+}
+</script>
+</body>
+</html>
