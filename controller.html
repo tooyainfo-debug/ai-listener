@@ -234,6 +234,7 @@ input:focus { outline: 1px solid #a78bfa; }
       <div class="form-row">
         <label for="apikey-input">APIキー</label>
         <input type="password" id="apikey-input" placeholder="AIzaSy..." autocomplete="off" spellcheck="false">
+        <button class="btn btn-primary" id="test-btn">テスト</button>
       </div>
       <div class="setup-error" id="setup-error"></div>
       <div class="form-row" style="margin-top:6px">
@@ -327,6 +328,7 @@ const setupScreen  = document.getElementById("setup-screen");
 const chatScreen   = document.getElementById("chat-screen");
 const apikeyInput       = document.getElementById("apikey-input");
 const startBtn          = document.getElementById("start-btn");
+const testBtn           = document.getElementById("test-btn");
 const setupError        = document.getElementById("setup-error");
 const transparentToggle = document.getElementById("transparent-toggle");
 const chatStatus   = document.getElementById("chat-status");
@@ -353,6 +355,7 @@ function showSetup() {
   setupScreen.hidden = false;
   apikeyInput.value  = localStorage.getItem(LS_APIKEY) || "";
   setupError.textContent = "";
+  setupError.style.color = "";
   applyTransparentMode();
 }
 
@@ -593,6 +596,33 @@ function startSpeech() {
 // =====================================================
 //  セットアップ画面：保存して開始
 // =====================================================
+testBtn.addEventListener("click", async () => {
+  const key = apikeyInput.value.trim();
+  if (!key) { setupError.textContent = "APIキーを入力してください"; return; }
+  testBtn.disabled = true;
+  setupError.style.color = "#9ca3af";
+  setupError.textContent = "テスト中...";
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models?key=${key}&pageSize=1`
+    );
+    if (res.ok) {
+      setupError.style.color = "#4ade80";
+      setupError.textContent = "✓ キーは有効です。「保存して開始」を押してください。";
+    } else {
+      const body = await res.json().catch(() => ({}));
+      setupError.style.color = "#fca5a5";
+      setupError.textContent = `✗ キーが無効です（${res.status}）。Google AI Studio で新しいキーを発行してください。`;
+      console.error("Key test failed:", body);
+    }
+  } catch (e) {
+    setupError.style.color = "#fca5a5";
+    setupError.textContent = "✗ 通信エラー。ネット接続を確認してください。";
+  } finally {
+    testBtn.disabled = false;
+  }
+});
+
 startBtn.addEventListener("click", () => {
   const key = apikeyInput.value.trim();
   if (!key) { setupError.textContent = "APIキーを入力してください"; return; }
